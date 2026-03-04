@@ -18,15 +18,17 @@ type AgentOptions struct {
 	BaseURL             string
 	Timeout             time.Duration
 	PermissionsCacheTTL time.Duration
+	DelegationToken     string
 }
 
 type AgentRuntime struct {
-	agentID    string
-	privateKey string
-	publicKey  string
-	baseURL    string
-	httpClient *http.Client
-	cacheTTL   time.Duration
+	agentID         string
+	privateKey      string
+	publicKey       string
+	baseURL         string
+	httpClient      *http.Client
+	cacheTTL        time.Duration
+	delegationToken string
 
 	mu          sync.RWMutex
 	cachedAllow []string
@@ -59,12 +61,13 @@ func NewAgent(opts AgentOptions) (*AgentRuntime, error) {
 		cacheTTL = 5 * time.Minute
 	}
 	return &AgentRuntime{
-		agentID:    opts.AgentID,
-		privateKey: opts.PrivateKey,
-		publicKey:  pubKey,
-		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: timeout},
-		cacheTTL:   cacheTTL,
+		agentID:         opts.AgentID,
+		privateKey:      opts.PrivateKey,
+		publicKey:       pubKey,
+		baseURL:         baseURL,
+		httpClient:      &http.Client{Timeout: timeout},
+		cacheTTL:        cacheTTL,
+		delegationToken: opts.DelegationToken,
 	}, nil
 }
 
@@ -81,7 +84,7 @@ func (a *AgentRuntime) SignedRequest(ctx context.Context, method, path string, b
 		}
 	}
 
-	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	var bodyPtr *string
 	if bodyBytes != nil {
@@ -268,7 +271,7 @@ func (a *AgentRuntime) Delegate(ctx context.Context, targetAgentID string, permi
 }
 
 func (a *AgentRuntime) CallTool(ctx context.Context, params *ToolCallParams) (*McpProxyResponse, error) {
-	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	mcpSig, err := Sign(BuildSignaturePayload("POST", "/mcp/proxy", timestamp, nil), a.privateKey)
 	if err != nil {
 		return nil, err
@@ -284,13 +287,18 @@ func (a *AgentRuntime) CallTool(ctx context.Context, params *ToolCallParams) (*M
 		mcpMethod = "tools/call"
 	}
 
+	token := params.DelegationToken
+	if token == "" {
+		token = a.delegationToken
+	}
+
 	authora := map[string]interface{}{
 		"agentId":   a.agentID,
 		"signature": mcpSig,
 		"timestamp": timestamp,
 	}
-	if params.DelegationToken != "" {
-		authora["delegationToken"] = params.DelegationToken
+	if token != "" {
+		authora["delegationToken"] = token
 	}
 
 	body := map[string]interface{}{

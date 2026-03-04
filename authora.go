@@ -136,6 +136,16 @@ func (c *Client) LoadAgent(opts AgentOptions) (*AgentRuntime, error) {
 	return NewAgent(opts)
 }
 
+func (c *Client) LoadDelegatedAgent(opts AgentOptions) (*AgentRuntime, error) {
+	if opts.DelegationToken == "" {
+		return nil, fmt.Errorf("authora: delegationToken required")
+	}
+	if opts.BaseURL == "" {
+		opts.BaseURL = c.http.baseURL
+	}
+	return NewAgent(opts)
+}
+
 func (c *Client) VerifyAgent(ctx context.Context, agentID string) (*VerifyAgentResponse, error) {
 	return c.Agents.Verify(ctx, agentID)
 }
