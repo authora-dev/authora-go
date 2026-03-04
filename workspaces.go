@@ -1,0 +1,44 @@
+package authora
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+)
+
+// WorkspacesService handles workspace-related API endpoints.
+type WorkspacesService struct {
+	client *httpClient
+}
+
+// Create creates a new workspace. POST /workspaces
+func (s *WorkspacesService) Create(ctx context.Context, input *CreateWorkspaceInput) (*Workspace, error) {
+	var resp Workspace
+	if err := s.client.request(ctx, http.MethodPost, "/workspaces", input, &resp); err != nil {
+		return nil, fmt.Errorf("workspaces.Create: %w", err)
+	}
+	return &resp, nil
+}
+
+// Get retrieves a single workspace by ID. GET /workspaces/:wsId
+func (s *WorkspacesService) Get(ctx context.Context, workspaceID string) (*Workspace, error) {
+	var resp Workspace
+	if err := s.client.request(ctx, http.MethodGet, "/workspaces/"+workspaceID, nil, &resp); err != nil {
+		return nil, fmt.Errorf("workspaces.Get: %w", err)
+	}
+	return &resp, nil
+}
+
+// List returns workspaces for an organization. GET /workspaces
+func (s *WorkspacesService) List(ctx context.Context, input *ListWorkspacesInput) (*PaginatedResponse[Workspace], error) {
+	q := queryString(map[string]interface{}{
+		"organizationId": input.OrganizationID,
+		"page":           input.Page,
+		"limit":          input.Limit,
+	})
+	var resp PaginatedResponse[Workspace]
+	if err := s.client.request(ctx, http.MethodGet, "/workspaces"+q, nil, &resp); err != nil {
+		return nil, fmt.Errorf("workspaces.List: %w", err)
+	}
+	return &resp, nil
+}
