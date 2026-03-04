@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const (
 	testAPIKey      = "authora_live_076270f52d3fc0fe9af9d08fe49b2803eb8b64ba5132fc76"
 	testBaseURL     = "https://api.authora.dev/api/v1"
@@ -31,10 +27,6 @@ func ptr[T any](v T) *T {
 func uniqueName(prefix string) string {
 	return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
 }
-
-// ---------------------------------------------------------------------------
-// 1. Agent Lifecycle
-// ---------------------------------------------------------------------------
 
 func TestAgentLifecycle(t *testing.T) {
 	client := newTestClient()
@@ -106,14 +98,9 @@ func TestAgentLifecycle(t *testing.T) {
 		if agent.Status != "REVOKED" {
 			t.Fatalf("expected status 'REVOKED', got %q", agent.Status)
 		}
-		// Already cleaned up; prevent double-revoke.
 		agentID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 1b. Agent Security Lifecycle (activate, suspend, rotate-key, verify)
-// ---------------------------------------------------------------------------
 
 func TestAgentSecurityLifecycle(t *testing.T) {
 	client := newTestClient()
@@ -126,7 +113,6 @@ func TestAgentSecurityLifecycle(t *testing.T) {
 		}
 	})
 
-	// Create
 	t.Run("Create", func(t *testing.T) {
 		agent, err := client.Agents.Create(ctx, &CreateAgentInput{
 			WorkspaceID: testWorkspaceID,
@@ -142,7 +128,6 @@ func TestAgentSecurityLifecycle(t *testing.T) {
 		}
 	})
 
-	// Activate with public key
 	t.Run("Activate", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -158,7 +143,6 @@ func TestAgentSecurityLifecycle(t *testing.T) {
 		}
 	})
 
-	// Rotate key (must be ACTIVE)
 	t.Run("RotateKey", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -169,10 +153,9 @@ func TestAgentSecurityLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RotateKey: %v", err)
 		}
-		_ = resp // response shape may vary
+		_ = resp
 	})
 
-	// Suspend
 	t.Run("Suspend", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -186,7 +169,6 @@ func TestAgentSecurityLifecycle(t *testing.T) {
 		}
 	})
 
-	// Revoke
 	t.Run("Revoke", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -201,10 +183,6 @@ func TestAgentSecurityLifecycle(t *testing.T) {
 		agentID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 2. RBAC Flow
-// ---------------------------------------------------------------------------
 
 func TestRBACFlow(t *testing.T) {
 	client := newTestClient()
@@ -226,7 +204,6 @@ func TestRBACFlow(t *testing.T) {
 		}
 	})
 
-	// Step 1: Create an agent for role assignment.
 	t.Run("SetupAgent", func(t *testing.T) {
 		agent, err := client.Agents.Create(ctx, &CreateAgentInput{
 			WorkspaceID: testWorkspaceID,
@@ -239,7 +216,6 @@ func TestRBACFlow(t *testing.T) {
 		agentID = agent.ID
 	})
 
-	// Step 2: Create a role with permissions.
 	t.Run("CreateRole", func(t *testing.T) {
 		role, err := client.Roles.Create(ctx, &CreateRoleInput{
 			WorkspaceID: testWorkspaceID,
@@ -257,7 +233,6 @@ func TestRBACFlow(t *testing.T) {
 		t.Logf("created role: %s", roleID)
 	})
 
-	// Step 3: Assign the role to the agent.
 	t.Run("AssignRole", func(t *testing.T) {
 		if agentID == "" || roleID == "" {
 			t.Skip("prerequisites missing")
@@ -274,7 +249,6 @@ func TestRBACFlow(t *testing.T) {
 		}
 	})
 
-	// Step 4: List agent roles.
 	t.Run("ListAgentRoles", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -291,9 +265,6 @@ func TestRBACFlow(t *testing.T) {
 		}
 	})
 
-	// Step 5: Check single permission (should be allowed via role).
-	// The permission check matches resource against the role's permission strings,
-	// so resource must be "files:read" (the full permission string).
 	t.Run("CheckPermission", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -311,7 +282,6 @@ func TestRBACFlow(t *testing.T) {
 		}
 	})
 
-	// Step 6: Batch check.
 	t.Run("BatchCheck", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -330,7 +300,6 @@ func TestRBACFlow(t *testing.T) {
 		if len(resp.Results) != 3 {
 			t.Fatalf("expected 3 results, got %d", len(resp.Results))
 		}
-		// files:read and files:write should be allowed; files:delete should be denied.
 		if !resp.Results[0].Allowed {
 			t.Error("files:read should be allowed")
 		}
@@ -342,7 +311,6 @@ func TestRBACFlow(t *testing.T) {
 		}
 	})
 
-	// Step 7: Unassign role.
 	t.Run("UnassignRole", func(t *testing.T) {
 		if agentID == "" || roleID == "" {
 			t.Skip("prerequisites missing")
@@ -352,7 +320,6 @@ func TestRBACFlow(t *testing.T) {
 		}
 	})
 
-	// Step 8: Delete role.
 	t.Run("DeleteRole", func(t *testing.T) {
 		if roleID == "" {
 			t.Skip("no role")
@@ -360,13 +327,9 @@ func TestRBACFlow(t *testing.T) {
 		if err := client.Roles.Delete(ctx, roleID); err != nil {
 			t.Fatalf("Delete role: %v", err)
 		}
-		roleID = "" // prevent double-delete in cleanup
+		roleID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 3. Policy Flow
-// ---------------------------------------------------------------------------
 
 func TestPolicyFlow(t *testing.T) {
 	client := newTestClient()
@@ -441,13 +404,9 @@ func TestPolicyFlow(t *testing.T) {
 		if err := client.Policies.Delete(ctx, policyID); err != nil {
 			t.Fatalf("Delete policy: %v", err)
 		}
-		policyID = "" // prevent double-delete
+		policyID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 4. Delegation Flow
-// ---------------------------------------------------------------------------
 
 func TestDelegationFlow(t *testing.T) {
 	client := newTestClient()
@@ -477,7 +436,6 @@ func TestDelegationFlow(t *testing.T) {
 		}
 	})
 
-	// Create two agents: issuer and delegatee.
 	t.Run("SetupAgents", func(t *testing.T) {
 		a1, err := client.Agents.Create(ctx, &CreateAgentInput{
 			WorkspaceID: testWorkspaceID,
@@ -500,7 +458,6 @@ func TestDelegationFlow(t *testing.T) {
 		delegateeID = a2.ID
 	})
 
-	// Create a role and assign to issuer so they hold the permissions.
 	t.Run("SetupIssuerRole", func(t *testing.T) {
 		if issuerID == "" {
 			t.Skip("no issuer")
@@ -524,7 +481,6 @@ func TestDelegationFlow(t *testing.T) {
 		}
 	})
 
-	// Create the delegation from issuer to delegatee.
 	t.Run("CreateDelegation", func(t *testing.T) {
 		if issuerID == "" || delegateeID == "" {
 			t.Skip("prerequisites missing")
@@ -586,13 +542,9 @@ func TestDelegationFlow(t *testing.T) {
 		if d.Status != "REVOKED" {
 			t.Fatalf("expected status 'REVOKED', got %q", d.Status)
 		}
-		delegationID = "" // prevent double-revoke in cleanup
+		delegationID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 5. Audit Flow
-// ---------------------------------------------------------------------------
 
 func TestAuditFlow(t *testing.T) {
 	client := newTestClient()
@@ -606,7 +558,6 @@ func TestAuditFlow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ListEvents: %v", err)
 		}
-		// The test workspace may or may not have events, so just check no error.
 		t.Logf("audit events total: %d, returned: %d", events.Total, len(events.Items))
 	})
 
@@ -620,10 +571,6 @@ func TestAuditFlow(t *testing.T) {
 		t.Logf("audit metric rows: %d", len(rows))
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 6. Webhook Flow
-// ---------------------------------------------------------------------------
 
 func TestWebhookFlow(t *testing.T) {
 	client := newTestClient()
@@ -688,13 +635,9 @@ func TestWebhookFlow(t *testing.T) {
 		if err := client.Webhooks.Delete(ctx, webhookID); err != nil {
 			t.Fatalf("Delete webhook: %v", err)
 		}
-		webhookID = "" // prevent double-delete
+		webhookID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 7. Alert Flow
-// ---------------------------------------------------------------------------
 
 func TestAlertFlow(t *testing.T) {
 	client := newTestClient()
@@ -762,13 +705,9 @@ func TestAlertFlow(t *testing.T) {
 		if err := client.Alerts.Delete(ctx, alertID); err != nil {
 			t.Fatalf("Delete alert: %v", err)
 		}
-		alertID = "" // prevent double-delete
+		alertID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 8. API Key Flow
-// ---------------------------------------------------------------------------
 
 func TestAPIKeyFlow(t *testing.T) {
 	client := newTestClient()
@@ -788,7 +727,6 @@ func TestAPIKeyFlow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("List API keys: %v", err)
 		}
-		// At minimum the key we are using exists.
 		t.Logf("found %d API keys", len(keys))
 	})
 
@@ -819,13 +757,9 @@ func TestAPIKeyFlow(t *testing.T) {
 		if err := client.APIKeys.Revoke(ctx, createdKeyID); err != nil {
 			t.Fatalf("Revoke API key: %v", err)
 		}
-		createdKeyID = "" // prevent double-delete
+		createdKeyID = ""
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 9. Notification Flow
-// ---------------------------------------------------------------------------
 
 func TestNotificationFlow(t *testing.T) {
 	client := newTestClient()
@@ -863,10 +797,6 @@ func TestNotificationFlow(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 10. Organization & Workspace
-// ---------------------------------------------------------------------------
 
 func TestOrgAndWorkspace(t *testing.T) {
 	client := newTestClient()
@@ -911,20 +841,14 @@ func TestOrgAndWorkspace(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 11. MCP Server & Tool Registration + Proxy
-// ---------------------------------------------------------------------------
-
 func TestMcpFlow(t *testing.T) {
 	client := newTestClient()
 	ctx := context.Background()
 	var serverID string
 
 	t.Cleanup(func() {
-		// No delete endpoint for MCP servers; cleanup is a no-op.
 	})
 
-	// Register MCP server
 	t.Run("RegisterServer", func(t *testing.T) {
 		server, err := client.Mcp.RegisterServer(ctx, &RegisterMcpServerInput{
 			WorkspaceID: testWorkspaceID,
@@ -942,7 +866,6 @@ func TestMcpFlow(t *testing.T) {
 		t.Logf("registered MCP server: %s", serverID)
 	})
 
-	// List servers
 	t.Run("ListServers", func(t *testing.T) {
 		servers, err := client.Mcp.ListServers(ctx, &ListMcpServersInput{
 			WorkspaceID: testWorkspaceID,
@@ -965,7 +888,6 @@ func TestMcpFlow(t *testing.T) {
 		}
 	})
 
-	// Get server
 	t.Run("GetServer", func(t *testing.T) {
 		if serverID == "" {
 			t.Skip("no server")
@@ -979,7 +901,6 @@ func TestMcpFlow(t *testing.T) {
 		}
 	})
 
-	// Update server
 	t.Run("UpdateServer", func(t *testing.T) {
 		if serverID == "" {
 			t.Skip("no server")
@@ -995,7 +916,6 @@ func TestMcpFlow(t *testing.T) {
 		}
 	})
 
-	// Register tool
 	t.Run("RegisterTool", func(t *testing.T) {
 		if serverID == "" {
 			t.Skip("no server")
@@ -1021,7 +941,6 @@ func TestMcpFlow(t *testing.T) {
 		}
 	})
 
-	// List tools
 	t.Run("ListTools", func(t *testing.T) {
 		if serverID == "" {
 			t.Skip("no server")
@@ -1045,14 +964,11 @@ func TestMcpFlow(t *testing.T) {
 		}
 	})
 
-	// Proxy: call echo tool through authorization pipeline
-	// Need an agent with MCP permissions
 	t.Run("Proxy", func(t *testing.T) {
 		if serverID == "" {
 			t.Skip("no server")
 		}
 
-		// Create agent + role for proxy auth
 		proxyAgent, err := client.Agents.Create(ctx, &CreateAgentInput{
 			WorkspaceID: testWorkspaceID,
 			Name:        uniqueName("go-mcp-proxy-agent"),
@@ -1099,16 +1015,11 @@ func TestMcpFlow(t *testing.T) {
 		}
 		t.Logf("proxy result: %s", resultStr)
 
-		// Cleanup
 		_ = client.Roles.UnassignFromAgent(ctx, proxyAgent.ID, proxyRole.ID)
 		_ = client.Roles.Delete(ctx, proxyRole.ID)
 		_, _ = client.Agents.Revoke(ctx, proxyAgent.ID)
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 12. Policy Simulate & Evaluate
-// ---------------------------------------------------------------------------
 
 func TestPolicySimulateEvaluate(t *testing.T) {
 	client := newTestClient()
@@ -1134,7 +1045,6 @@ func TestPolicySimulateEvaluate(t *testing.T) {
 		}
 	})
 
-	// Setup: agent + role + DENY policy
 	t.Run("Setup", func(t *testing.T) {
 		agent, err := client.Agents.Create(ctx, &CreateAgentInput{
 			WorkspaceID: testWorkspaceID,
@@ -1182,7 +1092,6 @@ func TestPolicySimulateEvaluate(t *testing.T) {
 		policyID = policy.ID
 	})
 
-	// Simulate
 	t.Run("Simulate", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")
@@ -1199,7 +1108,6 @@ func TestPolicySimulateEvaluate(t *testing.T) {
 		t.Logf("simulate decision: %s, reason: %v", resp.Decision, resp.Reason)
 	})
 
-	// Evaluate
 	t.Run("Evaluate", func(t *testing.T) {
 		if agentID == "" {
 			t.Skip("no agent")

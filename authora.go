@@ -1,39 +1,19 @@
-// Package authora provides a Go client for the Authora API.
-//
-// Authora is an identity and authorization platform for AI agents.
-// This SDK provides typed access to all Authora API endpoints with
-// zero external dependencies.
-//
-// Usage:
-//
-//	client := authora.NewClient("authora_live_...")
-//	agent, err := client.Agents.Create(ctx, &authora.CreateAgentInput{
-//	    WorkspaceID: "ws_...",
-//	    Name:        "my-agent",
-//	    CreatedBy:   "user_...",
-//	})
 package authora
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"time"
 )
 
 const (
-	// Version is the SDK version.
-	Version = "0.1.0"
-
-	// DefaultBaseURL is the default Authora API base URL.
+	Version        = "0.1.0"
 	DefaultBaseURL = "https://api.authora.dev/api/v1"
-
-	// DefaultTimeout is the default HTTP client timeout.
 	DefaultTimeout = 30 * time.Second
 )
 
-// Client is the Authora API client. It exposes service objects for each
-// API resource, following the pattern client.Resource.Method(ctx, input).
 type Client struct {
-	// Service objects for each API resource.
 	Agents        *AgentsService
 	Roles         *RolesService
 	Permissions   *PermissionsService
@@ -51,7 +31,6 @@ type Client struct {
 	http *httpClient
 }
 
-// Option configures the Client.
 type Option func(*clientConfig)
 
 type clientConfig struct {
@@ -60,34 +39,24 @@ type clientConfig struct {
 	httpClient *http.Client
 }
 
-// WithBaseURL overrides the default API base URL.
 func WithBaseURL(url string) Option {
 	return func(c *clientConfig) {
 		c.baseURL = url
 	}
 }
 
-// WithTimeout sets the HTTP client timeout.
 func WithTimeout(d time.Duration) Option {
 	return func(c *clientConfig) {
 		c.timeout = d
 	}
 }
 
-// WithHTTPClient sets a custom *http.Client for all requests.
-// When set, the timeout option is ignored (configure it on the client directly).
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *clientConfig) {
 		c.httpClient = hc
 	}
 }
 
-// NewClient creates a new Authora API client.
-//
-//	client := authora.NewClient("authora_live_...",
-//	    authora.WithBaseURL("https://custom.api.dev/api/v1"),
-//	    authora.WithTimeout(10 * time.Second),
-//	)
 func NewClient(apiKey string, opts ...Option) *Client {
 	cfg := &clientConfig{
 		baseURL: DefaultBaseURL,
@@ -128,4 +97,45 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	client.Workspaces = &WorkspacesService{client: httpC}
 
 	return client
+}
+
+func (c *Client) CreateAgent(ctx context.Context, input *CreateAgentInput) (*AgentRuntime, *KeyPair, error) {
+	agent, err := c.Agents.Create(ctx, input)
+	if err != nil {
+		return nil, nil, fmt.Errorf("authora: create agent: %w", err)
+	}
+
+	kp, err := GenerateKeyPair()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, err = c.Agents.Activate(ctx, agent.ID, &ActivateAgentInput{
+		PublicKey: kp.PublicKey,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("authora: activate agent: %w", err)
+	}
+
+	runtime, err := NewAgent(AgentOptions{
+		AgentID:    agent.ID,
+		PrivateKey: kp.PrivateKey,
+		BaseURL:    c.http.baseURL,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return runtime, kp, nil
+}
+
+func (c *Client) LoadAgent(opts AgentOptions) (*AgentRuntime, error) {
+	if opts.BaseURL == "" {
+		opts.BaseURL = c.http.baseURL
+	}
+	return NewAgent(opts)
+}
+
+func (c *Client) VerifyAgent(ctx context.Context, agentID string) (*VerifyAgentResponse, error) {
+	return c.Agents.Verify(ctx, agentID)
 }

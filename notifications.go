@@ -6,12 +6,10 @@ import (
 	"net/http"
 )
 
-// NotificationsService handles notification-related API endpoints.
 type NotificationsService struct {
 	client *httpClient
 }
 
-// List returns notifications. GET /notifications
 func (s *NotificationsService) List(ctx context.Context, input *ListNotificationsInput) (*PaginatedResponse[Notification], error) {
 	q := queryString(map[string]interface{}{
 		"organizationId": input.OrganizationID,
@@ -27,8 +25,6 @@ func (s *NotificationsService) List(ctx context.Context, input *ListNotification
 	return &resp, nil
 }
 
-// UnreadCount returns the number of unread notifications.
-// GET /notifications/unread-count
 func (s *NotificationsService) UnreadCount(ctx context.Context, input *UnreadCountInput) (*UnreadCountResponse, error) {
 	q := queryString(map[string]interface{}{
 		"organizationId": input.OrganizationID,
@@ -41,8 +37,6 @@ func (s *NotificationsService) UnreadCount(ctx context.Context, input *UnreadCou
 	return &resp, nil
 }
 
-// MarkRead marks a single notification as read.
-// PATCH /notifications/:notificationId/read
 func (s *NotificationsService) MarkRead(ctx context.Context, notificationID string) (*Notification, error) {
 	var resp Notification
 	if err := s.client.request(ctx, http.MethodPatch, "/notifications/"+notificationID+"/read", nil, &resp); err != nil {
@@ -51,8 +45,6 @@ func (s *NotificationsService) MarkRead(ctx context.Context, notificationID stri
 	return &resp, nil
 }
 
-// MarkAllRead marks all notifications as read.
-// PATCH /notifications/read-all
 func (s *NotificationsService) MarkAllRead(ctx context.Context, input *MarkAllReadInput) error {
 	if err := s.client.request(ctx, http.MethodPatch, "/notifications/read-all", input, nil); err != nil {
 		return fmt.Errorf("notifications.MarkAllRead: %w", err)

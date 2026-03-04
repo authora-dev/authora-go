@@ -6,12 +6,10 @@ import (
 	"net/http"
 )
 
-// AuditService handles audit-related API endpoints.
 type AuditService struct {
 	client *httpClient
 }
 
-// ListEvents returns a paginated list of audit events. GET /audit/events
 func (s *AuditService) ListEvents(ctx context.Context, input *ListAuditEventsInput) (*PaginatedResponse[AuditEvent], error) {
 	q := ""
 	if input != nil {
@@ -35,7 +33,6 @@ func (s *AuditService) ListEvents(ctx context.Context, input *ListAuditEventsInp
 	return &resp, nil
 }
 
-// GetEvent retrieves a single audit event by ID. GET /audit/events/:eventId
 func (s *AuditService) GetEvent(ctx context.Context, eventID string) (*AuditEvent, error) {
 	var resp AuditEvent
 	if err := s.client.request(ctx, http.MethodGet, "/audit/events/"+eventID, nil, &resp); err != nil {
@@ -44,7 +41,6 @@ func (s *AuditService) GetEvent(ctx context.Context, eventID string) (*AuditEven
 	return &resp, nil
 }
 
-// CreateReport generates an audit report. POST /audit/reports
 func (s *AuditService) CreateReport(ctx context.Context, input *CreateAuditReportInput) (*AuditReport, error) {
 	var resp AuditReport
 	if err := s.client.request(ctx, http.MethodPost, "/audit/reports", input, &resp); err != nil {
@@ -53,7 +49,6 @@ func (s *AuditService) CreateReport(ctx context.Context, input *CreateAuditRepor
 	return &resp, nil
 }
 
-// GetMetrics returns audit metrics. GET /audit/metrics
 func (s *AuditService) GetMetrics(ctx context.Context, input *AuditMetricsInput) ([]AuditMetricRow, error) {
 	q := queryString(map[string]interface{}{
 		"orgId":       input.OrgID,

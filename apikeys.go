@@ -6,12 +6,10 @@ import (
 	"net/http"
 )
 
-// APIKeysService handles API key management endpoints.
 type APIKeysService struct {
 	client *httpClient
 }
 
-// Create creates a new API key. POST /api-keys
 func (s *APIKeysService) Create(ctx context.Context, input *CreateAPIKeyInput) (*CreateAPIKeyResponse, error) {
 	var resp CreateAPIKeyResponse
 	if err := s.client.request(ctx, http.MethodPost, "/api-keys", input, &resp); err != nil {
@@ -20,7 +18,6 @@ func (s *APIKeysService) Create(ctx context.Context, input *CreateAPIKeyInput) (
 	return &resp, nil
 }
 
-// List returns API keys for an organization. GET /api-keys
 func (s *APIKeysService) List(ctx context.Context, input *ListAPIKeysInput) ([]APIKey, error) {
 	q := queryString(map[string]interface{}{
 		"organizationId": input.OrganizationID,
@@ -32,7 +29,6 @@ func (s *APIKeysService) List(ctx context.Context, input *ListAPIKeysInput) ([]A
 	return resp, nil
 }
 
-// Revoke deletes an API key. DELETE /api-keys/:keyId
 func (s *APIKeysService) Revoke(ctx context.Context, keyID string) error {
 	if err := s.client.request(ctx, http.MethodDelete, "/api-keys/"+keyID, nil, nil); err != nil {
 		return fmt.Errorf("apikeys.Revoke: %w", err)

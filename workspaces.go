@@ -6,12 +6,10 @@ import (
 	"net/http"
 )
 
-// WorkspacesService handles workspace-related API endpoints.
 type WorkspacesService struct {
 	client *httpClient
 }
 
-// Create creates a new workspace. POST /workspaces
 func (s *WorkspacesService) Create(ctx context.Context, input *CreateWorkspaceInput) (*Workspace, error) {
 	var resp Workspace
 	if err := s.client.request(ctx, http.MethodPost, "/workspaces", input, &resp); err != nil {
@@ -20,7 +18,6 @@ func (s *WorkspacesService) Create(ctx context.Context, input *CreateWorkspaceIn
 	return &resp, nil
 }
 
-// Get retrieves a single workspace by ID. GET /workspaces/:wsId
 func (s *WorkspacesService) Get(ctx context.Context, workspaceID string) (*Workspace, error) {
 	var resp Workspace
 	if err := s.client.request(ctx, http.MethodGet, "/workspaces/"+workspaceID, nil, &resp); err != nil {
@@ -29,7 +26,6 @@ func (s *WorkspacesService) Get(ctx context.Context, workspaceID string) (*Works
 	return &resp, nil
 }
 
-// List returns workspaces for an organization. GET /workspaces
 func (s *WorkspacesService) List(ctx context.Context, input *ListWorkspacesInput) (*PaginatedResponse[Workspace], error) {
 	q := queryString(map[string]interface{}{
 		"organizationId": input.OrganizationID,

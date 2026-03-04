@@ -11,14 +11,12 @@ import (
 	"strings"
 )
 
-// httpClient wraps net/http to provide JSON request/response handling.
 type httpClient struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
 }
 
-// newHTTPClient creates a new httpClient.
 func newHTTPClient(baseURL, apiKey string, client *http.Client) *httpClient {
 	return &httpClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
@@ -27,14 +25,10 @@ func newHTTPClient(baseURL, apiKey string, client *http.Client) *httpClient {
 	}
 }
 
-// request performs an HTTP request and decodes the JSON response into dest.
-// If dest is nil, the response body is discarded.
-// If body is nil, no request body is sent.
 func (h *httpClient) request(ctx context.Context, method, path string, body interface{}, dest interface{}) error {
 	return h.requestWithAuth(ctx, method, path, body, dest, true)
 }
 
-// requestNoAuth performs an HTTP request without authentication.
 func (h *httpClient) requestNoAuth(ctx context.Context, method, path string, body interface{}, dest interface{}) error {
 	return h.requestWithAuth(ctx, method, path, body, dest, false)
 }
@@ -56,9 +50,6 @@ func (h *httpClient) requestWithAuth(ctx context.Context, method, path string, b
 		return fmt.Errorf("authora: failed to create request: %w", err)
 	}
 
-	// Only set Content-Type when there is a body to send.
-	// Sending Content-Type: application/json with an empty body causes Fastify
-	// to reject the request with FST_ERR_CTP_EMPTY_JSON_BODY.
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -84,7 +75,6 @@ func (h *httpClient) requestWithAuth(ctx context.Context, method, path string, b
 			StatusCode: resp.StatusCode,
 		}
 		if len(respBody) > 0 {
-			// Try to parse structured error.
 			var errResp struct {
 				Message string `json:"message"`
 				Code    string `json:"code"`
@@ -108,7 +98,6 @@ func (h *httpClient) requestWithAuth(ctx context.Context, method, path string, b
 	}
 
 	if dest != nil && len(respBody) > 0 {
-		// Unwrap the backend's { "data": T } / { "data": [], "pagination": {} } envelope.
 		unwrapped := unwrapResponse(respBody)
 		if err := json.Unmarshal(unwrapped, dest); err != nil {
 			return fmt.Errorf("authora: failed to decode response: %w", err)
@@ -118,8 +107,6 @@ func (h *httpClient) requestWithAuth(ctx context.Context, method, path string, b
 	return nil
 }
 
-// unwrapResponse extracts the inner payload from the API's response envelope.
-// The Authora API wraps responses in { "data": T } or { "data": [...], "pagination": {...} }.
 func unwrapResponse(raw []byte) []byte {
 	var envelope struct {
 		Data       json.RawMessage `json:"data"`
@@ -130,18 +117,15 @@ func unwrapResponse(raw []byte) []byte {
 		return raw
 	}
 
-	// Determine if data is an array
 	trimmed := bytes.TrimSpace(envelope.Data)
 	isArray := len(trimmed) > 0 && trimmed[0] == '['
 
-	// Get pagination info from either "pagination" or "meta"
 	paginationRaw := envelope.Pagination
 	if paginationRaw == nil {
 		paginationRaw = envelope.Meta
 	}
 
 	if isArray && paginationRaw != nil {
-		// Build a paginated list: { "items": [...], "total": N, "page": N, "limit": N }
 		var pg struct {
 			Total int `json:"total"`
 			Page  int `json:"page"`
@@ -155,17 +139,12 @@ func unwrapResponse(raw []byte) []byte {
 	}
 
 	if isArray {
-		// Array without pagination: return the raw array so that both []T
-		// and struct{Items []T} targets can be unmarshalled correctly.
 		return envelope.Data
 	}
 
-	// Single entity: return unwrapped data
 	return envelope.Data
 }
 
-// queryString builds a URL query string from a map of parameters.
-// Nil values are skipped.
 func queryString(params map[string]interface{}) string {
 	values := url.Values{}
 	for k, v := range params {
