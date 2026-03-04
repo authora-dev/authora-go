@@ -1,9 +1,12 @@
 package authora
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 type AuditService struct {
@@ -62,4 +65,47 @@ func (s *AuditService) GetMetrics(ctx context.Context, input *AuditMetricsInput)
 		return nil, fmt.Errorf("audit.GetMetrics: %w", err)
 	}
 	return resp, nil
+}
+
+func (s *AuditService) StreamEvents(ctx context.Context, onEvent func(AuditEvent)) error {
+	url := s.client.baseURL + "/audit/stream"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("audit.StreamEvents: %w", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Authorization", "Bearer "+s.client.apiKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("audit.StreamEvents: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("audit.StreamEvents: unexpected status %d", resp.StatusCode)
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	var eventType, data string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "event: ") {
+			eventType = strings.TrimSpace(line[7:])
+		} else if strings.HasPrefix(line, "data: ") {
+			data = line[6:]
+		} else if line == "" && data != "" {
+			if eventType == "audit" {
+				var ev AuditEvent
+				if json.Unmarshal([]byte(data), &ev) == nil {
+					onEvent(ev)
+				}
+			}
+			eventType = ""
+			data = ""
+		}
+	}
+
+	return scanner.Err()
 }

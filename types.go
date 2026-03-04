@@ -75,6 +75,7 @@ type Role struct {
 	DenyPermissions    []string `json:"denyPermissions,omitempty"`
 	Stage              *string  `json:"stage,omitempty"`
 	MaxSessionDuration *int     `json:"maxSessionDuration,omitempty"`
+	IsBuiltin          bool     `json:"isBuiltin"`
 	CreatedAt          string   `json:"createdAt"`
 	UpdatedAt          string   `json:"updatedAt"`
 }
