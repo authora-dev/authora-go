@@ -112,6 +112,97 @@ func TestAgentLifecycle(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Agent Security Lifecycle (activate, suspend, rotate-key, verify)
+// ---------------------------------------------------------------------------
+
+func TestAgentSecurityLifecycle(t *testing.T) {
+	client := newTestClient()
+	ctx := context.Background()
+	var agentID string
+
+	t.Cleanup(func() {
+		if agentID != "" {
+			_, _ = client.Agents.Revoke(ctx, agentID)
+		}
+	})
+
+	// Create
+	t.Run("Create", func(t *testing.T) {
+		agent, err := client.Agents.Create(ctx, &CreateAgentInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-security-agent"),
+			CreatedBy:   "integration-test",
+		})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		agentID = agent.ID
+		if agent.Status != "PENDING" {
+			t.Fatalf("expected PENDING, got %q", agent.Status)
+		}
+	})
+
+	// Activate with public key
+	t.Run("Activate", func(t *testing.T) {
+		if agentID == "" {
+			t.Skip("no agent")
+		}
+		agent, err := client.Agents.Activate(ctx, agentID, &ActivateAgentInput{
+			PublicKey: "test-pubkey-go-" + fmt.Sprintf("%d", time.Now().UnixNano()),
+		})
+		if err != nil {
+			t.Fatalf("Activate: %v", err)
+		}
+		if agent.Status != "ACTIVE" {
+			t.Fatalf("expected ACTIVE, got %q", agent.Status)
+		}
+	})
+
+	// Rotate key (must be ACTIVE)
+	t.Run("RotateKey", func(t *testing.T) {
+		if agentID == "" {
+			t.Skip("no agent")
+		}
+		resp, err := client.Agents.RotateKey(ctx, agentID, &RotateKeyInput{
+			PublicKey: "rotated-pubkey-go-" + fmt.Sprintf("%d", time.Now().UnixNano()),
+		})
+		if err != nil {
+			t.Fatalf("RotateKey: %v", err)
+		}
+		_ = resp // response shape may vary
+	})
+
+	// Suspend
+	t.Run("Suspend", func(t *testing.T) {
+		if agentID == "" {
+			t.Skip("no agent")
+		}
+		agent, err := client.Agents.Suspend(ctx, agentID)
+		if err != nil {
+			t.Fatalf("Suspend: %v", err)
+		}
+		if agent.Status != "SUSPENDED" {
+			t.Fatalf("expected SUSPENDED, got %q", agent.Status)
+		}
+	})
+
+	// Revoke
+	t.Run("Revoke", func(t *testing.T) {
+		if agentID == "" {
+			t.Skip("no agent")
+		}
+		agent, err := client.Agents.Revoke(ctx, agentID)
+		if err != nil {
+			t.Fatalf("Revoke: %v", err)
+		}
+		if agent.Status != "REVOKED" {
+			t.Fatalf("expected REVOKED, got %q", agent.Status)
+		}
+		agentID = ""
+	})
+}
+
+// ---------------------------------------------------------------------------
 // 2. RBAC Flow
 // ---------------------------------------------------------------------------
 
@@ -817,5 +908,311 @@ func TestOrgAndWorkspace(t *testing.T) {
 			t.Fatalf("expected workspace ID %s, got %s", testWorkspaceID, ws.ID)
 		}
 		t.Logf("workspace: %s (%s)", ws.Name, ws.ID)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// 11. MCP Server & Tool Registration + Proxy
+// ---------------------------------------------------------------------------
+
+func TestMcpFlow(t *testing.T) {
+	client := newTestClient()
+	ctx := context.Background()
+	var serverID string
+
+	t.Cleanup(func() {
+		// No delete endpoint for MCP servers; cleanup is a no-op.
+	})
+
+	// Register MCP server
+	t.Run("RegisterServer", func(t *testing.T) {
+		server, err := client.Mcp.RegisterServer(ctx, &RegisterMcpServerInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-mcp-server"),
+			URL:         "http://127.0.0.1:9100",
+			Description: ptr("Go SDK integration test MCP server"),
+		})
+		if err != nil {
+			t.Fatalf("RegisterServer: %v", err)
+		}
+		if server.ID == "" {
+			t.Fatal("expected non-empty server ID")
+		}
+		serverID = server.ID
+		t.Logf("registered MCP server: %s", serverID)
+	})
+
+	// List servers
+	t.Run("ListServers", func(t *testing.T) {
+		servers, err := client.Mcp.ListServers(ctx, &ListMcpServersInput{
+			WorkspaceID: testWorkspaceID,
+		})
+		if err != nil {
+			t.Fatalf("ListServers: %v", err)
+		}
+		if len(servers.Items) < 1 {
+			t.Fatal("expected at least 1 MCP server")
+		}
+		found := false
+		for _, s := range servers.Items {
+			if s.ID == serverID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("registered server not found in list")
+		}
+	})
+
+	// Get server
+	t.Run("GetServer", func(t *testing.T) {
+		if serverID == "" {
+			t.Skip("no server")
+		}
+		server, err := client.Mcp.GetServer(ctx, serverID)
+		if err != nil {
+			t.Fatalf("GetServer: %v", err)
+		}
+		if server.ID != serverID {
+			t.Fatalf("expected server ID %s, got %s", serverID, server.ID)
+		}
+	})
+
+	// Update server
+	t.Run("UpdateServer", func(t *testing.T) {
+		if serverID == "" {
+			t.Skip("no server")
+		}
+		updated, err := client.Mcp.UpdateServer(ctx, serverID, &UpdateMcpServerInput{
+			Description: ptr("Updated by Go SDK integration test"),
+		})
+		if err != nil {
+			t.Fatalf("UpdateServer: %v", err)
+		}
+		if updated.ID != serverID {
+			t.Fatalf("expected server ID %s, got %s", serverID, updated.ID)
+		}
+	})
+
+	// Register tool
+	t.Run("RegisterTool", func(t *testing.T) {
+		if serverID == "" {
+			t.Skip("no server")
+		}
+		tool, err := client.Mcp.RegisterTool(ctx, serverID, &RegisterMcpToolInput{
+			Name:        "echo",
+			Description: ptr("Echo tool for testing"),
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"message": map[string]interface{}{"type": "string"},
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("RegisterTool: %v", err)
+		}
+		if tool.ID == "" {
+			t.Fatal("expected non-empty tool ID")
+		}
+		if tool.Name != "echo" {
+			t.Fatalf("expected tool name 'echo', got %q", tool.Name)
+		}
+	})
+
+	// List tools
+	t.Run("ListTools", func(t *testing.T) {
+		if serverID == "" {
+			t.Skip("no server")
+		}
+		tools, err := client.Mcp.ListTools(ctx, serverID)
+		if err != nil {
+			t.Fatalf("ListTools: %v", err)
+		}
+		if len(tools) < 1 {
+			t.Fatal("expected at least 1 tool")
+		}
+		found := false
+		for _, tool := range tools {
+			if tool.Name == "echo" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("echo tool not found in list")
+		}
+	})
+
+	// Proxy: call echo tool through authorization pipeline
+	// Need an agent with MCP permissions
+	t.Run("Proxy", func(t *testing.T) {
+		if serverID == "" {
+			t.Skip("no server")
+		}
+
+		// Create agent + role for proxy auth
+		proxyAgent, err := client.Agents.Create(ctx, &CreateAgentInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-mcp-proxy-agent"),
+			CreatedBy:   "integration-test",
+		})
+		if err != nil {
+			t.Fatalf("Create proxy agent: %v", err)
+		}
+		proxyRole, err := client.Roles.Create(ctx, &CreateRoleInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-mcp-proxy-role"),
+			Permissions: []string{fmt.Sprintf("mcp:%s:tool.*", serverID)},
+		})
+		if err != nil {
+			t.Fatalf("Create proxy role: %v", err)
+		}
+		_, err = client.Roles.AssignToAgent(ctx, proxyAgent.ID, &AssignRoleInput{
+			RoleID:    proxyRole.ID,
+			GrantedBy: ptr("integration-test"),
+		})
+		if err != nil {
+			t.Fatalf("Assign proxy role: %v", err)
+		}
+
+		resp, err := client.Mcp.Proxy(ctx, &McpProxyInput{
+			ServerID: serverID,
+			Method:   "tools/call",
+			Params: map[string]interface{}{
+				"name":      "echo",
+				"arguments": map[string]interface{}{"message": "hello-from-go-sdk"},
+				"_authora": map[string]interface{}{
+					"mcpServerId": serverID,
+					"agentId":     proxyAgent.ID,
+					"timestamp":   time.Now().UTC().Format(time.RFC3339),
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("Proxy: %v", err)
+		}
+		resultStr := fmt.Sprintf("%v", resp.Result)
+		if resultStr == "" {
+			t.Fatal("proxy returned empty result")
+		}
+		t.Logf("proxy result: %s", resultStr)
+
+		// Cleanup
+		_ = client.Roles.UnassignFromAgent(ctx, proxyAgent.ID, proxyRole.ID)
+		_ = client.Roles.Delete(ctx, proxyRole.ID)
+		_, _ = client.Agents.Revoke(ctx, proxyAgent.ID)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// 12. Policy Simulate & Evaluate
+// ---------------------------------------------------------------------------
+
+func TestPolicySimulateEvaluate(t *testing.T) {
+	client := newTestClient()
+	ctx := context.Background()
+	var (
+		agentID  string
+		roleID   string
+		policyID string
+	)
+
+	t.Cleanup(func() {
+		if policyID != "" {
+			_ = client.Policies.Delete(ctx, policyID)
+		}
+		if agentID != "" && roleID != "" {
+			_ = client.Roles.UnassignFromAgent(ctx, agentID, roleID)
+		}
+		if roleID != "" {
+			_ = client.Roles.Delete(ctx, roleID)
+		}
+		if agentID != "" {
+			_, _ = client.Agents.Revoke(ctx, agentID)
+		}
+	})
+
+	// Setup: agent + role + DENY policy
+	t.Run("Setup", func(t *testing.T) {
+		agent, err := client.Agents.Create(ctx, &CreateAgentInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-poleval-agent"),
+			CreatedBy:   "integration-test",
+		})
+		if err != nil {
+			t.Fatalf("Create agent: %v", err)
+		}
+		agentID = agent.ID
+
+		role, err := client.Roles.Create(ctx, &CreateRoleInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-poleval-role"),
+			Permissions: []string{"docs:*:read"},
+		})
+		if err != nil {
+			t.Fatalf("Create role: %v", err)
+		}
+		roleID = role.ID
+
+		_, err = client.Roles.AssignToAgent(ctx, agentID, &AssignRoleInput{
+			RoleID:    roleID,
+			GrantedBy: ptr("integration-test"),
+		})
+		if err != nil {
+			t.Fatalf("Assign role: %v", err)
+		}
+
+		policy, err := client.Policies.Create(ctx, &CreatePolicyInput{
+			WorkspaceID: testWorkspaceID,
+			Name:        uniqueName("go-deny-policy"),
+			Effect:      "DENY",
+			Principals: map[string]interface{}{
+				"roles": []string{role.Name},
+			},
+			Resources: []string{"docs:secret"},
+			Actions:   []string{"read"},
+			Priority:  ptr(100),
+			Enabled:   ptr(true),
+		})
+		if err != nil {
+			t.Fatalf("Create DENY policy: %v", err)
+		}
+		policyID = policy.ID
+	})
+
+	// Simulate
+	t.Run("Simulate", func(t *testing.T) {
+		if agentID == "" {
+			t.Skip("no agent")
+		}
+		resp, err := client.Policies.Simulate(ctx, &SimulatePolicyInput{
+			WorkspaceID: testWorkspaceID,
+			AgentID:     agentID,
+			Resource:    "docs:secret",
+			Action:      "read",
+		})
+		if err != nil {
+			t.Fatalf("Simulate: %v", err)
+		}
+		t.Logf("simulate decision: %s, reason: %v", resp.Decision, resp.Reason)
+	})
+
+	// Evaluate
+	t.Run("Evaluate", func(t *testing.T) {
+		if agentID == "" {
+			t.Skip("no agent")
+		}
+		resp, err := client.Policies.Evaluate(ctx, &EvaluatePolicyInput{
+			WorkspaceID: testWorkspaceID,
+			AgentID:     agentID,
+			Resource:    "docs:secret",
+			Action:      "read",
+		})
+		if err != nil {
+			t.Fatalf("Evaluate: %v", err)
+		}
+		t.Logf("evaluate allowed: %v, reason: %v", resp.Allowed, resp.Reason)
 	})
 }

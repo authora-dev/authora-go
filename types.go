@@ -411,16 +411,26 @@ type RegisterMcpToolInput struct {
 	InputSchema map[string]interface{} `json:"inputSchema,omitempty"`
 }
 
-// McpProxyInput is the request body for POST /mcp/proxy.
+// McpProxyInput is the user-facing input for proxy calls.
+// The SDK builds the proper JSON-RPC 2.0 request internally.
 type McpProxyInput struct {
-	ServerID string                 `json:"serverId"`
-	Method   string                 `json:"method"`
-	Params   map[string]interface{} `json:"params,omitempty"`
+	ServerID string                 `json:"-"` // Used to populate _authora.mcpServerId
+	Method   string                 `json:"-"` // JSON-RPC method
+	Params   map[string]interface{} `json:"-"` // JSON-RPC params (merged with _authora)
+}
+
+// mcpProxyJsonRpc is the actual JSON-RPC 2.0 body sent to POST /mcp/proxy.
+type mcpProxyJsonRpc struct {
+	Jsonrpc string                 `json:"jsonrpc"`
+	Method  string                 `json:"method"`
+	ID      int                    `json:"id"`
+	Params  map[string]interface{} `json:"params,omitempty"`
 }
 
 // McpProxyResponse is the response from POST /mcp/proxy.
 type McpProxyResponse struct {
 	Result interface{} `json:"result"`
+	Error  interface{} `json:"error,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
