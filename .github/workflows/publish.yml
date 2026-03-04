@@ -1,0 +1,28 @@
+name: Release Go Module
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Verify module
+        run: go vet ./...
+
+      - name: Request Go proxy indexing
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          curl -sf "https://proxy.golang.org/github.com/authora-dev/authora-go/@v/${TAG}.info" || echo "Proxy will index shortly"
+          echo "Module available at: https://pkg.go.dev/github.com/authora-dev/authora-go@${TAG}"
