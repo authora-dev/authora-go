@@ -14,19 +14,22 @@ const (
 )
 
 type Client struct {
-	Agents        *AgentsService
-	Roles         *RolesService
-	Permissions   *PermissionsService
-	Delegations   *DelegationsService
-	Policies      *PoliciesService
-	Mcp           *McpService
-	Audit         *AuditService
-	Notifications *NotificationsService
-	Webhooks      *WebhooksService
-	Alerts        *AlertsService
-	APIKeys       *APIKeysService
-	Organizations *OrganizationsService
-	Workspaces    *WorkspacesService
+	Agents          *AgentsService
+	Roles           *RolesService
+	Permissions     *PermissionsService
+	Delegations     *DelegationsService
+	UserDelegations *UserDelegationsService
+	Policies        *PoliciesService
+	Mcp             *McpService
+	Audit           *AuditService
+	Notifications   *NotificationsService
+	Webhooks        *WebhooksService
+	Alerts          *AlertsService
+	APIKeys         *APIKeysService
+	Organizations   *OrganizationsService
+	Workspaces      *WorkspacesService
+	Approvals       *ApprovalsService
+	Credits         *CreditsService
 
 	http *httpClient
 }
@@ -86,6 +89,7 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	client.Roles = &RolesService{client: httpC}
 	client.Permissions = &PermissionsService{client: httpC}
 	client.Delegations = &DelegationsService{client: httpC}
+	client.UserDelegations = &UserDelegationsService{client: httpC}
 	client.Policies = &PoliciesService{client: httpC}
 	client.Mcp = &McpService{client: httpC}
 	client.Audit = &AuditService{client: httpC}
@@ -95,6 +99,8 @@ func NewClient(apiKey string, opts ...Option) *Client {
 	client.APIKeys = &APIKeysService{client: httpC}
 	client.Organizations = &OrganizationsService{client: httpC}
 	client.Workspaces = &WorkspacesService{client: httpC}
+	client.Approvals = &ApprovalsService{client: httpC}
+	client.Credits = &CreditsService{client: httpC}
 
 	return client
 }

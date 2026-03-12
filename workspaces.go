@@ -38,3 +38,27 @@ func (s *WorkspacesService) List(ctx context.Context, input *ListWorkspacesInput
 	}
 	return &resp, nil
 }
+
+func (s *WorkspacesService) Update(ctx context.Context, workspaceID string, input *UpdateWorkspaceInput) (*Workspace, error) {
+	var resp Workspace
+	if err := s.client.request(ctx, http.MethodPatch, "/workspaces/"+workspaceID, input, &resp); err != nil {
+		return nil, fmt.Errorf("workspaces.Update: %w", err)
+	}
+	return &resp, nil
+}
+
+func (s *WorkspacesService) Delete(ctx context.Context, workspaceID string) (*Workspace, error) {
+	var resp Workspace
+	if err := s.client.request(ctx, http.MethodDelete, "/workspaces/"+workspaceID, nil, &resp); err != nil {
+		return nil, fmt.Errorf("workspaces.Delete: %w", err)
+	}
+	return &resp, nil
+}
+
+func (s *WorkspacesService) Restore(ctx context.Context, workspaceID string) (*Workspace, error) {
+	var resp Workspace
+	if err := s.client.request(ctx, http.MethodPost, "/workspaces/"+workspaceID+"/restore", nil, &resp); err != nil {
+		return nil, fmt.Errorf("workspaces.Restore: %w", err)
+	}
+	return &resp, nil
+}

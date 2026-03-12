@@ -67,6 +67,14 @@ func (s *McpService) RegisterTool(ctx context.Context, serverID string, input *R
 	return &resp, nil
 }
 
+func (s *McpService) DiscoverTools(ctx context.Context, serverID string) (*McpToolDiscoveryResult, error) {
+	var resp McpToolDiscoveryResult
+	if err := s.client.request(ctx, http.MethodPost, "/mcp/servers/"+serverID+"/discover", nil, &resp); err != nil {
+		return nil, fmt.Errorf("mcp.DiscoverTools: %w", err)
+	}
+	return &resp, nil
+}
+
 func (s *McpService) Proxy(ctx context.Context, input *McpProxyInput) (*McpProxyResponse, error) {
 	params := make(map[string]interface{})
 	for k, v := range input.Params {

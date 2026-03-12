@@ -11,8 +11,21 @@ Official Go client for the [Authora](https://authora.dev) API -- identity and au
 ## Installation
 
 ```bash
-go get github.com/authora-dev/authora-go@v0.1.0
+go get github.com/authora-dev/authora-go@v0.2.1
 ```
+
+## Find Your Credentials
+
+Several SDK methods require identifiers that are generated when you sign up:
+
+| Value | Format | Where to find it |
+|---|---|---|
+| **API Key** | `authora_live_...` | [Account page](https://www.authora.dev/account) > API Keys tab |
+| **Workspace ID** | `ws_...` | [Account page](https://www.authora.dev/account) > Profile tab > SDK Quick Start |
+| **User ID** | `usr_...` | [Account page](https://www.authora.dev/account) > Profile tab > User ID |
+| **Organization ID** | `org_...` | [Account page](https://www.authora.dev/account) > Profile tab > Organization ID |
+
+The `CreatedBy` parameter used when creating agents or API keys is your **User ID** (`usr_...`).
 
 ## Quick Start
 
@@ -29,7 +42,7 @@ import (
 )
 
 func main() {
-    client := authora.NewClient("authora_live_...",
+    client := authora.NewClient("authora_live_...", // from Account > API Keys
         authora.WithBaseURL("https://api.authora.dev/api/v1"),
         authora.WithTimeout(30*time.Second),
     )
@@ -38,9 +51,9 @@ func main() {
 
     // Create an agent
     resp, err := client.Agents.Create(ctx, &authora.CreateAgentInput{
-        WorkspaceID: "ws_abc123",
+        WorkspaceID: "ws_...",    // from Account > Profile
         Name:        "my-agent",
-        CreatedBy:   "user_xyz",
+        CreatedBy:   "usr_...",   // your User ID
     })
     if err != nil {
         log.Fatal(err)
@@ -262,9 +275,9 @@ Optional fields use pointer types. Use the address-of operator to set them:
 ```go
 desc := "My agent description"
 agent, err := client.Agents.Create(ctx, &authora.CreateAgentInput{
-    WorkspaceID: "ws_abc123",
+    WorkspaceID: "ws_...",    // from Account > Profile
     Name:        "my-agent",
-    CreatedBy:   "user_xyz",
+    CreatedBy:   "usr_...",   // your User ID
     Description: &desc,
     Tags:        []string{"production", "billing"},
 })
@@ -290,6 +303,86 @@ fmt.Printf("Total: %d, Page %d/%d\n", agents.Total, agents.Page, agents.TotalPag
 for _, a := range agents.Data {
     fmt.Printf("  - %s (%s)\n", a.Name, a.Status)
 }
+```
+
+## Agent Runtime
+
+The `AgentRuntime` provides a full agent runtime with Ed25519 signed requests, thread-safe permission caching, delegation, and MCP tool calls.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    authora "github.com/authora-dev/authora-go"
+)
+
+func main() {
+    client := authora.NewClient("authora_live_...")
+    ctx := context.Background()
+
+    // Create + activate an agent (generates Ed25519 keypair locally)
+    runtime, keyPair, err := client.CreateAgent(ctx, &authora.CreateAgentInput{
+        WorkspaceID: "ws_...",        // from Account > Profile
+        Name:        "data-processor",
+        CreatedBy:   "usr_...",       // your User ID
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Agent: %s, Public Key: %s\n", runtime.AgentID(), keyPair.PublicKey)
+
+    // All requests are Ed25519-signed automatically
+    profile, err := runtime.GetProfile(ctx)
+    doc, err := runtime.GetIdentityDocument(ctx)
+
+    // Server-side permission check
+    check, err := runtime.CheckPermission(ctx, "files:read", "read", nil)
+
+    // Client-side cached check (deny-first, 5-minute TTL, sync.RWMutex)
+    allowed, err := runtime.HasPermission(ctx, "mcp:server1:tool.query")
+    if allowed {
+        result, err := runtime.CallTool(ctx, &authora.ToolCallParams{
+            ToolName:  "query",
+            Arguments: map[string]interface{}{"sql": "SELECT 1"},
+        })
+    }
+
+    // Delegate permissions
+    delegation, err := runtime.Delegate(ctx, "agent_...",
+        []string{"files:read"},
+        &authora.DelegationConstraints{ExpiresIn: "1h"},
+    )
+
+    // Key rotation
+    updatedAgent, newKeyPair, err := runtime.RotateKey(ctx)
+
+    // Lifecycle
+    _, err = runtime.Suspend(ctx)
+    _, _, err = runtime.Reactivate(ctx)
+    _, err = runtime.Revoke(ctx)
+}
+```
+
+## Cryptography
+
+Ed25519 key generation, signing, and verification via Go stdlib `crypto/ed25519`.
+
+```go
+import authora "github.com/authora-dev/authora-go"
+
+// Generate Ed25519 keypair (base64url encoded)
+keyPair, err := authora.GenerateKeyPair()
+
+// Sign and verify
+sig, err := authora.Sign("hello world", keyPair.PrivateKey)
+valid := authora.Verify("hello world", sig, keyPair.PublicKey)
+
+// Build canonical signature payload
+payload := authora.BuildSignaturePayload("POST", "/api/v1/agents", timestamp, &body)
 ```
 
 ## License
