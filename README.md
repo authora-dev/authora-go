@@ -161,6 +161,12 @@ client.Policies.Update(ctx, policyID, &UpdatePolicyInput{...})  // PATCH  /polic
 client.Policies.Delete(ctx, policyID)                           // DELETE /policies/:policyId
 client.Policies.Simulate(ctx, &SimulatePolicyInput{...})        // POST   /policies/simulate
 client.Policies.Evaluate(ctx, &EvaluatePolicyInput{...})        // POST   /policies/evaluate
+client.Policies.AttachToTarget(ctx, &AttachPolicyInput{...})         // POST   /policies/attachments
+client.Policies.DetachFromTarget(ctx, &DetachPolicyInput{...})       // POST   /policies/detach
+client.Policies.ListAttachments(ctx, &ListAttachmentsInput{...})     // GET    /policies/attachments
+client.Policies.ListPolicyTargets(ctx, policyID)                     // GET    /policies/:policyId/attachments
+client.Policies.AddPermission(ctx, &AddPermissionInput{...})         // POST   /policies/add-permission
+client.Policies.RemovePermission(ctx, &RemovePermissionInput{...})   // POST   /policies/remove-permission
 ```
 
 ### MCP (Model Context Protocol)
@@ -233,6 +239,45 @@ client.Organizations.List(ctx, &ListOrganizationsInput{...})      // GET  /organ
 client.Workspaces.Create(ctx, &CreateWorkspaceInput{...})   // POST /workspaces
 client.Workspaces.Get(ctx, workspaceID)                     // GET  /workspaces/:wsId
 client.Workspaces.List(ctx, &ListWorkspacesInput{...})      // GET  /workspaces
+```
+
+### Approvals
+
+```go
+client.Approvals.Create(ctx, &CreateApprovalInput{...})                   // POST   /approvals
+client.Approvals.List(ctx, &ListApprovalsInput{...})                      // GET    /approvals
+client.Approvals.Get(ctx, challengeID)                                    // GET    /approvals/:id
+client.Approvals.Decide(ctx, challengeID, &DecideApprovalInput{...})      // POST   /approvals/:id/decide
+client.Approvals.BulkDecide(ctx, &BulkDecideInput{...})                   // POST   /approvals/bulk-decide
+client.Approvals.Stats(ctx)                                               // GET    /approvals/stats
+client.Approvals.ListEscalationRules(ctx)                                 // GET    /approvals/escalation-rules
+client.Approvals.CreateEscalationRule(ctx, &CreateEscalationRuleInput{})  // POST   /approvals/escalation-rules
+client.Approvals.UpdateEscalationRule(ctx, ruleID, &UpdateEscalationRuleInput{})  // PATCH  /approvals/escalation-rules/:id
+client.Approvals.DeleteEscalationRule(ctx, ruleID)                        // DELETE /approvals/escalation-rules/:id
+```
+
+### Credits
+
+```go
+client.Credits.Balance(ctx)                                          // GET  /credits
+client.Credits.Transactions(ctx, &ListTransactionsInput{...})        // GET  /credits/transactions
+client.Credits.Checkout(ctx, &CreditCheckoutInput{...})              // POST /credits/checkout
+```
+
+### User Delegations
+
+```go
+client.UserDelegations.Create(ctx, &CreateGrantInput{...})                  // POST /user-delegations
+client.UserDelegations.Get(ctx, grantID)                                    // GET  /user-delegations/:grantId
+client.UserDelegations.ListByUser(ctx, userID, &ListGrantsInput{...})       // GET  /user-delegations/by-user/:userId
+client.UserDelegations.ListByAgent(ctx, agentID, &ListGrantsInput{...})     // GET  /user-delegations/by-agent/:agentId
+client.UserDelegations.Revoke(ctx, grantID, &RevokeGrantInput{...})         // POST /user-delegations/:grantId/revoke
+client.UserDelegations.IssueToken(ctx, grantID, &IssueTokenInput{...})      // POST /user-delegations/:grantId/token
+client.UserDelegations.VerifyToken(ctx, &VerifyTokenInput{...})             // POST /user-delegations/tokens/verify
+client.UserDelegations.CreateTrust(ctx, &CreateTrustInput{...})             // POST /user-delegations/trust
+client.UserDelegations.ListTrust(ctx, orgID)                                // GET  /user-delegations/trust/by-org/:orgId
+client.UserDelegations.ApproveTrust(ctx, trustID)                           // POST /user-delegations/trust/:trustId/approve
+client.UserDelegations.RevokeTrust(ctx, trustID)                            // POST /user-delegations/trust/:trustId/revoke
 ```
 
 ## Error Handling

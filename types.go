@@ -299,6 +299,34 @@ type EvaluatePolicyResponse struct {
 	Reason          *string  `json:"reason,omitempty"`
 }
 
+type AttachPolicyInput struct {
+	PolicyID   string `json:"policyId"`
+	TargetType string `json:"targetType"`
+	TargetID   string `json:"targetId"`
+}
+
+type PolicyAttachment struct {
+	ID         string  `json:"id"`
+	PolicyID   string  `json:"policyId"`
+	TargetType string  `json:"targetType"`
+	TargetID   string  `json:"targetId"`
+	CreatedBy  *string `json:"createdBy,omitempty"`
+	CreatedAt  string  `json:"createdAt"`
+}
+
+type ListAttachmentsInput struct {
+	TargetType string `json:"targetType"`
+	TargetID   string `json:"targetId"`
+}
+
+type AddPermissionInput struct {
+	PolicyID  string   `json:"policyId"`
+	Resources []string `json:"resources,omitempty"`
+	Actions   []string `json:"actions,omitempty"`
+}
+
+type RemovePermissionInput = AddPermissionInput
+
 type McpServer struct {
 	ID          string                 `json:"id"`
 	WorkspaceID string                 `json:"workspaceId"`
