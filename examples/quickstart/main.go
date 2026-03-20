@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -9,13 +10,15 @@ import (
 
 func main() {
 	client := authora.NewClient(os.Getenv("AUTHORA_API_KEY"))
+	ctx := context.Background()
 
-	agent, err := client.Agents.Create(authora.CreateAgentInput{
+	agent, err := client.Agents.Create(ctx, &authora.CreateAgentInput{
+		WorkspaceID: "ws_...",
 		Name:        "my-agent",
-		WorkspaceId: "ws_...",
+		CreatedBy:   "quickstart",
 	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Created agent:", agent.Id)
+	fmt.Println("Created agent:", agent.ID)
 }
