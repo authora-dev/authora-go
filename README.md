@@ -1,6 +1,60 @@
 # Authora Go SDK
 
-Official Go client for the [Authora](https://authora.dev) API -- identity and authorization for AI agents.
+Authorization for AI agents -- identity, permissions, and delegation management.
+
+## Quick Start
+
+```go
+// go get github.com/authora-dev/authora-go@v0.4.2
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    authora "github.com/authora-dev/authora-go"
+)
+
+func main() {
+    client := authora.NewClient("authora_live_...")
+    ctx := context.Background()
+
+    // Check a permission
+    check, err := client.Permissions.Check(ctx, &authora.CheckPermissionInput{
+        AgentID: "agt_abc", Resource: "files:*", Action: "read",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Allowed: %t\n", check.Allowed)
+}
+```
+
+## Installation
+
+```bash
+go get github.com/authora-dev/authora-go@v0.4.2
+```
+
+## Getting Credentials
+
+**Automatic (IDE agents):** If you use Claude Code, Cursor, or OpenCode, credentials are created automatically on first run via browser sign-in. See [self-onboarding instructions](https://authora.dev/llms-onboard.txt).
+
+**Manual:** Sign up at [authora.dev/get-started](https://authora.dev/get-started), then find your credentials:
+
+| Value | Format | Where to find it |
+|---|---|---|
+| **API Key** | `authora_live_...` | [Dashboard](https://client.authora.dev) > API Keys |
+| **Workspace ID** | `ws_...` | [Dashboard](https://client.authora.dev) > Settings |
+| **User ID** | `usr_...` | [Dashboard](https://client.authora.dev) > Settings |
+| **Organization ID** | `org_...` | [Dashboard](https://client.authora.dev) > Settings |
+
+**Environment variables (Docker/CI):** Set `AUTHORA_API_KEY`, `AUTHORA_AGENT_ID`, `AUTHORA_ORG_ID`, `AUTHORA_WORKSPACE_ID`.
+
+The `CreatedBy` parameter used when creating agents or API keys is your **User ID** (`usr_...`).
+
+## Features
 
 - Go 1.21+
 - Zero external dependencies (`net/http` + `encoding/json` only)
@@ -8,26 +62,7 @@ Official Go client for the [Authora](https://authora.dev) API -- identity and au
 - Functional options for client configuration
 - Typed errors with helper predicates
 
-## Installation
-
-```bash
-go get github.com/authora-dev/authora-go@v0.2.1
-```
-
-## Find Your Credentials
-
-Several SDK methods require identifiers that are generated when you sign up:
-
-| Value | Format | Where to find it |
-|---|---|---|
-| **API Key** | `authora_live_...` | [Account page](https://www.authora.dev/account) > API Keys tab |
-| **Workspace ID** | `ws_...` | [Account page](https://www.authora.dev/account) > Profile tab > SDK Quick Start |
-| **User ID** | `usr_...` | [Account page](https://www.authora.dev/account) > Profile tab > User ID |
-| **Organization ID** | `org_...` | [Account page](https://www.authora.dev/account) > Profile tab > Organization ID |
-
-The `CreatedBy` parameter used when creating agents or API keys is your **User ID** (`usr_...`).
-
-## Quick Start
+## Extended Quick Start
 
 ```go
 package main
